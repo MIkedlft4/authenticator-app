@@ -100,6 +100,7 @@ button{margin-top:10px;padding:10px 12px;border-radius:10px;border:0;background:
 </div>
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 <script>
 // ------------------ STORAGE ------------------
 const DB_KEY='local_totp_auth_v1';
@@ -147,12 +148,18 @@ doRegister.onclick=async()=>{
     DB.users[u]={salt,hash,totp:''};saveDB(DB);regMsg.textContent='Account created!';regUser.value='';regPass.value=''
 }
 
-doLogin.onclick=async()=>{
-    const u=logUser.value.trim(),p=logPass.value.trim();if(!u||!p){logMsg.textContent='Fill both fields';return;}
-    if(!DB.users[u]){logMsg.textContent='User not found';return;}
-    const {salt,hash}=DB.users[u];const check=await hashPassword(p,salt)
-    if(check!==hash){logMsg.textContent='Wrong password';return;}
-    login(u)
+doLogin.onclick = async () => {
+    const u = logUser.value.trim();
+    const p = logPass.value.trim();
+    if (!u || !p) { logMsg.textContent = 'Fill both fields'; return; }
+    if (!DB.users[u]) { logMsg.textContent = 'User not found'; return; }
+    const { salt, hash } = DB.users[u];
+    try {
+        const check = await hashPassword(p, salt);
+        if (check !== hash) { logMsg.textContent = 'Wrong password'; return; }
+        logUser.value = ''; logPass.value = ''; logMsg.textContent = '';
+        login(u);
+    } catch (e) { logMsg.textContent = 'Error logging in'; console.error(e); }
 }
 
 function login(username){
@@ -161,7 +168,7 @@ function login(username){
 }
 
 // ------------------ TOTP & INTERVAL ------------------
-let running=false,intervalSec=parseFloat(intervalSelect.value),timer;
+let running=false,intervalSec=parseFloat(intervalSelect.value);
 intervalSelect.addEventListener('change', ()=>{
     let newInterval=parseFloat(intervalSelect.value);
     if(newInterval<1){
@@ -172,20 +179,17 @@ intervalSelect.addEventListener('change', ()=>{
 })
 
 function updateStatus(txt){status.textContent=txt}
-
 function generateCode(){
     const secret=totpSecret.value.trim();if(!secret){codeEl.textContent='------';return;}
     const val=getTOTP(secret,intervalSec);codeEl.textContent=val
 }
 
+let timer;
 function startGen(){
     if(!totpSecret.value.trim()){appMsg.textContent='Enter secret key';return;}
     running=true;updateStatus('Running');startBtn.style.display='none';stopBtn.style.display='inline-block';cycle()
 }
-
-function stopGen(){
-    running=false;updateStatus('Stopped');startBtn.style.display='inline-block';stopBtn.style.display='none';expires.textContent='--';bar.style.transform='scaleX(0)'
-}
+function stopGen(){running=false;updateStatus('Stopped');startBtn.style.display='inline-block';stopBtn.style.display='none';expires.textContent='--';bar.style.transform='scaleX(0)'}
 
 function cycle(){
     if(!running)return;
@@ -193,7 +197,8 @@ function cycle(){
     const start=Date.now();const duration=intervalSec*1000;
     function step(){
         if(!running)return;
-        const now=Date.now();const pct=Math.min(1,(now-start)/duration);bar.style.transform=`scaleX(${pct})`;expires.textContent=(intervalSec-(now-start)/1000).toFixed(1)+'s';
+        const now=Date.now();const pct=Math.min(1,(now-start)/duration);
+        bar.style.transform=`scaleX(${pct})`;expires.textContent=(intervalSec-(now-start)/1000).toFixed(1)+'s';
         if(pct>=1){generateCode();cycle()}else requestAnimationFrame(step);
     }requestAnimationFrame(step);
 }
@@ -204,13 +209,12 @@ stopBtn.onclick=stopGen
 copyBtn.onclick=()=>{navigator.clipboard.writeText(codeEl.textContent);appMsg.textContent='Copied!';setTimeout(()=>appMsg.textContent='',1500)}
 logoutBtn.onclick=()=>{authView.style.display='block';appView.style.display='none';updateStatus('Stopped');running=false}
 delAccount.onclick=()=>{
-    if(confirm('Are you sure you want to delete your account?')){delete DB.users[who.textContent];saveDB(DB);authView.style.display='block';appView.style.display='none'}
+    if(confirm('Are you sure you want to delete your account?')){
+        delete DB.users[who.textContent];saveDB(DB);authView.style.display='block';appView.style.display='none'
+    }
 }
 
 // ------------------ LIBRARY ------------------
 !function(a,b){var c={};c.HmacSHA1=function(a,b){return CryptoJS.HmacSHA1(a,b).toString(CryptoJS.enc.Hex)};window.CryptoJS=c}(window);
 </script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 </body>
-</html>
